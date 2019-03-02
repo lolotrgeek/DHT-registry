@@ -3,6 +3,7 @@ import asyncio
 
 from level import LevelStorage
 from kademlia.network import Server
+from kademlia.storage import ForgetfulStorage
 
 class New():
     def __init__(self, port):
@@ -20,7 +21,6 @@ class New():
             server.stop()
             loop.close()
 
-
 class Logger():
     def __init__ (self):
         handler = logging.StreamHandler()
@@ -32,33 +32,46 @@ class Logger():
         
 
 class NodeServer ():
-    def __init__ (self, node, port, **kwargs):
-        storage = kwargs.get('storage', LevelStorage())
+    def __init__ (self, address : str, port : int, **kwargs):
+        name = str(port)
+        defaultstore = LevelStorage(name)
+        # defaultstore = ForgetfulStorage()
+        storage = kwargs.get('storage', defaultstore)
+        bootstrap_nodes = kwargs.get('bootstrap', [])
         server = Server(storage=storage)
-        self.node = node
         self.port = port
+        self.bootstrap_nodes = bootstrap_nodes 
         self.server = server
 
-    async def start (self, myport):
-        await self.server.listen(myport)
-        bootstrap_node = (self.node, int(self.port))
-        await self.server.bootstrap([bootstrap_node])
+    async def start (self):
+        await self.server.listen(self.port)
+        # bootstrap_node = (self.node, int(self.port))
+        if len(self.bootstrap_nodes) > 0 :
+            await self.server.bootstrap(self.bootstrap_nodes)
 
     async def stop (self):
         await self.server.stop()
-
-class Node(NodeServer):
-    def __init__ (self, node, port):
-        NodeServer.__init__(self, node, port)
-        self.node = node
-        self.port = port
-
+        
     async def get(self, key):
-        await NodeServer.start(self, 8469) 
         result = await self.server.get(key)
         return result
 
     async def put (self, key, value):
-        await NodeServer.start(self, 8469) 
         await self.server.set(key, value)
         return (key, value)
+
+class Node(NodeServer):
+    def __init__ (self, address : str, port : int, **kwargs):
+        NodeServer.__init__(self, address, port, **kwargs)
+        self.address = address
+        self.port = port
+
+    # async def get(self, key):
+    #     await NodeServer.start(self) 
+    #     result = await self.server.get(key)
+    #     return result
+
+    # async def put (self, key, value):
+    #     await NodeServer.start(self) 
+    #     await self.server.set(key, value)
+    #     return (key, value)

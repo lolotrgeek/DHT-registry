@@ -9,18 +9,18 @@ from ast import literal_eval as make_tuple
 from kademlia.storage import IStorage
 
 class LevelStorage(IStorage):
-    def __init__(self, ttl=604800):
+    def __init__(self, name : str, ttl=604800):
         """
         By default, max age is a week.
         """
-        db = level.DB('registry', create_if_missing=True)
+        db = level.DB(name, create_if_missing=True)
         self.db = db
         self.data = None
         self.ttl = ttl
 
     def __setitem__(self, key, value):
         timestamp = str(time.monotonic())
-        encodedtimevalue = str((timestamp, value)).encode('utf-8')
+        encodedtimevalue = str((timestamp, value)).encode('utf-8') #TODO: try encoding ascii
         self.db.put(key,encodedtimevalue)
         self.cull()
 
@@ -78,5 +78,7 @@ class LevelStorage(IStorage):
     def dump(self):
         return zip(self.db.iterator())
 
+    def clone(self):
+        return self.db.snapshot()
     # def await_blocking(self, func):
     #     return self.loop.run_in_executor(None, func)

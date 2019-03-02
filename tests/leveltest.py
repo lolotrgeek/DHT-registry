@@ -3,7 +3,7 @@ import time
 import operator
 from ast import literal_eval as make_tuple
 
-db = level.DB('registry', create_if_missing=True)
+db = level.DB('./testdb', create_if_missing=True)
 
 
 timestamp = str(time.monotonic())
@@ -46,7 +46,6 @@ def main():
     # print('keys: ', list(ikeys))
     # print('birthdays: ', list(ibirthday))
     # print('items: ', list(iitems))
-
     print(list(zip(ikeys, ibirthday, ivalues)))
 
     print(list(zip(db.iterator())))
