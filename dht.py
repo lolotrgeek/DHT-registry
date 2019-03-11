@@ -1,25 +1,9 @@
 import logging
 import asyncio
+import pickle
 
 from level import LevelStorage
 from kademlia.network import Server
-from kademlia.storage import ForgetfulStorage
-
-class New():
-    def __init__(self, port):
-        loop = asyncio.get_event_loop()
-        loop.set_debug(True)
-
-        server = Server()
-        loop.run_until_complete(server.listen(port))
-
-        try:
-            loop.run_forever()
-        except KeyboardInterrupt:
-            pass
-        finally:
-            server.stop()
-            loop.close()
 
 class Logger():
     def __init__ (self):
@@ -29,27 +13,66 @@ class Logger():
         log = logging.getLogger('kademlia')
         log.addHandler(handler)
         log.setLevel(logging.DEBUG)
+        self.log = log
         
+class NodeServer(Server):
+    def __init__ (self, ksize=20, alpha=3, node_id=None, storage=None, **kwargs):
+        super().__init__(ksize=20, alpha=3, node_id=None, storage=None)
 
-class NodeServer ():
+    async def load_state(self, fname):
+        """
+        Load the state of this node (the alpha/ksize/id/immediate neighbors)
+        from a cache file with the given fname.
+        """
+        print("Loading state from %s", fname)
+        with open(fname, 'rb') as file:
+            data = pickle.load(file)
+
+        return (data['ksize'], data['alpha'], data['id'], data['neighbors'])
+
+class Node ():
     def __init__ (self, address : str, port : int, **kwargs):
         name = str(port)
-        defaultstore = LevelStorage(name)
-        # defaultstore = ForgetfulStorage()
+        self.id = name 
+        defaultlogger = Logger().log
+        defaultstore = LevelStorage(self.id)
+        log = kwargs.get('logger', defaultlogger)
         storage = kwargs.get('storage', defaultstore)
         bootstrap_nodes = kwargs.get('bootstrap', [])
-        server = Server(storage=storage)
+        server = NodeServer(storage=storage)
+        self.storage = storage
+        self.address = address
         self.port = port
         self.bootstrap_nodes = bootstrap_nodes 
         self.server = server
+        self.fname = 'state'+str(port)
+        self.log = log
+
 
     async def start (self):
-        await self.server.listen(self.port)
-        # bootstrap_node = (self.node, int(self.port))
-        if len(self.bootstrap_nodes) > 0 :
-            await self.server.bootstrap(self.bootstrap_nodes)
+        try:
+            state = await self.server.load_state(self.fname)
+            self.id = state[2]
+            # print(state)
+            self.log.info("Updating Server '%s'", self.server)
+            self.server = NodeServer(ksize=state[0], alpha=state[1], node_id=state[2], storage=self.storage)
+            await self.server.listen(self.port, self.address)
+            # print(state[3])
+            await self.server.bootstrap(state[3])
+        except :
+            self.log.info('New state from kwargs')
+            await self.server.listen(self.port, self.address)
+            # bootstrap_node = (self.node, int(self.port))
+            if len(self.bootstrap_nodes) > 0 :
+                await self.server.bootstrap(self.bootstrap_nodes)
+
+        finally :
+            self.server.save_state(self.fname)
+            self.server.save_state_regularly(self.fname, frequency=10)
+
 
     async def stop (self):
+        await self.server.save_state(self.fname)
         await self.server.stop()
         
     async def get(self, key):
@@ -59,19 +82,3 @@ class NodeServer ():
     async def put (self, key, value):
         await self.server.set(key, value)
         return (key, value)
-
-class Node(NodeServer):
-    def __init__ (self, address : str, port : int, **kwargs):
-        NodeServer.__init__(self, address, port, **kwargs)
-        self.address = address
-        self.port = port
-
-    # async def get(self, key):
-    #     await NodeServer.start(self) 
-    #     result = await self.server.get(key)
-    #     return result
-
-    # async def put (self, key, value):
-    #     await NodeServer.start(self) 
-    #     await self.server.set(key, value)
-    #     return (key, value)
