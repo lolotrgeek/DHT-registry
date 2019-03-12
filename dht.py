@@ -2,6 +2,7 @@ import random
 import logging
 import asyncio
 import pickle
+import utils
 
 from level import LevelStorage
 from kademlia.network import Server
@@ -50,7 +51,8 @@ class NodeServer(Server):
             'id': self.node.id,
             'neighbors': self.bootstrappable_neighbors()
         }
-        print('STATE: ', data)
+        # print('STATE: ', data)
+        log.info("Neighbors: %s", data['neighbors'])
         with open(fname, 'wb') as file:
             pickle.dump(data, file)
 
@@ -68,7 +70,6 @@ class Node ():
 
 
     async def start (self):
-
         if self.logging == True:
             Logger()
         try:
@@ -90,8 +91,8 @@ class Node ():
                 self.server.save_state(self.fname)
                 if len(self.bootstrap_nodes) > 0 :
                     await self.server.bootstrap(self.bootstrap_nodes)
-            except: 
-                return
+            except : 
+                utils.removeDB(self.node_id)
         finally :
             self.server.save_state_regularly(self.fname, frequency=10)
 

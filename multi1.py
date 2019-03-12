@@ -2,7 +2,7 @@ import asyncio
 
 from dht import Node
 
-node = Node('127.0.0.1', 8468, bootstrap=[('127.0.0.1', 8469)])
+node = Node('127.0.0.1', 8468)
 
 async def main():
     put = await node.put('key1', 'value1')
